@@ -1,0 +1,6 @@
+@Crossplatform_2_smirnova_HostAddress = http://localhost:5244
+
+GET {{Crossplatform_2_smirnova_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
