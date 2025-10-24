@@ -9,6 +9,13 @@ namespace Crossplatform_2_smirnova.Models
         User
     }
 
+    public enum UserStatus
+    {
+        Active,
+        Blocked,
+        Archived
+    }
+
     public class User
     {
         [Key]
@@ -27,32 +34,42 @@ namespace Crossplatform_2_smirnova.Models
         [Required]
         public UserRole Role { get; set; } = UserRole.User;
 
-        public bool IsActive { get; set; } = true;   // Для блокировки
-        public bool IsArchived { get; set; } = false; // Для архивации
+        [Required]
+        public UserStatus Status { get; set; } = UserStatus.Active;
 
-        // Бизнес-логика
+
         public void Archive()
         {
-            IsArchived = true;
-            IsActive = false; // Архивированный пользователь не может быть активным
+            Status = UserStatus.Archived;
         }
 
         public void RestoreFromArchive()
         {
-            IsArchived = false;
-            IsActive = true;
+            Status = UserStatus.Active;
+        }
+
+        public void Block()
+        {
+            Status = UserStatus.Blocked;
+        }
+
+        public void Unblock()
+        {
+            Status = UserStatus.Active;
         }
 
         public bool CanEditBooking(Booking booking)
         {
-            // Архивированный пользователь не может редактировать брони
-            return !IsArchived && (Role == UserRole.Admin || booking.UserId == Id);
+            // Только активные пользователи могут редактировать брони
+            return Status == UserStatus.Active &&
+                   (Role == UserRole.Admin || booking.UserId == Id);
         }
 
         public bool CanManageRoom(Room room)
         {
-            // Архивированный пользователь не может управлять комнатами
-            return !IsArchived && (Role == UserRole.Admin || room.OwnerId == Id);
+            // Только активные пользователи могут управлять комнатами
+            return Status == UserStatus.Active &&
+                   (Role == UserRole.Admin || room.OwnerId == Id);
         }
     }
 }

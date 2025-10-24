@@ -3,6 +3,7 @@ using System;
 using Crossplatform_2_smirnova.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Crossplatform_2_smirnova.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251024095056_AddBookingRoomPriceAndStatuses")]
+    partial class AddBookingRoomPriceAndStatuses
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.10");
@@ -125,17 +128,6 @@ namespace Crossplatform_2_smirnova.Migrations
                         .IsUnique();
 
                     b.ToTable("Users");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 3,
-                            Email = "admin@example.com",
-                            Name = "Admin",
-                            PasswordHash = "$2a$11$65jcjY9zzNv6j5f55Oh52.yStCAEt4WZaUdqynjYGNKJW1mHYoPqq",
-                            Role = 0,
-                            Status = 0
-                        });
                 });
 
             modelBuilder.Entity("Crossplatform_2_smirnova.Models.Booking", b =>

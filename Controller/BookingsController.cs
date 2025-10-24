@@ -1,5 +1,5 @@
-﻿using Crossplatform_2_smirnova.Services;
-using Microsoft.AspNetCore.Http;
+﻿using Crossplatform_2_smirnova.Models;
+using Crossplatform_2_smirnova.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Crossplatform_2_smirnova.Controller
@@ -15,45 +15,49 @@ namespace Crossplatform_2_smirnova.Controller
             _bookingService = bookingService;
         }
 
-
-        [HttpPost]
-        public async Task<IActionResult> CreateBooking(int userId, int roomId, DateTime start, DateTime end)
-        {
-            var (success, error) = await _bookingService.CreateBookingAsync(userId, roomId, start, end);
-            if (!success) return BadRequest(error);
-            return Ok("Бронирование успешно создано");
-        }
-
+        // Получить все брони (для админа — все, для пользователя — только свои)
         [HttpGet]
-        public async Task<IActionResult> GetBookings()
+        public async Task<IActionResult> GetBookings([FromQuery] int currentUserId)
         {
-            var bookings = await _bookingService.GetAllBookingsAsync();
+            var bookings = await _bookingService.GetAllBookingsAsync(currentUserId);
             return Ok(bookings);
         }
 
+        // Получить бронь по ID
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetBooking(int id)
+        public async Task<IActionResult> GetBooking(int id, [FromQuery] int currentUserId)
         {
-            var booking = await _bookingService.GetBookingAsync(id);
+            var booking = await _bookingService.GetBookingAsync(id, currentUserId);
             if (booking == null)
-                return NotFound("Бронь не найдена.");
+                return NotFound("Бронь не найдена или недоступна для текущего пользователя.");
             return Ok(booking);
         }
 
-        [HttpPut("{id}/cancel")]
-        public async Task<IActionResult> CancelBooking(int id)
+        // Создание брони
+        [HttpPost]
+        public async Task<IActionResult> CreateBooking([FromQuery] int userId, [FromQuery] int roomId, [FromQuery] DateTime start, [FromQuery] DateTime end)
         {
-            var (success, error) = await _bookingService.CancelBookingAsync(id);
+            var (success, error) = await _bookingService.CreateBookingAsync(userId, roomId, start, end);
             if (!success) return BadRequest(error);
-            return Ok("Бронь успешно отменена");
+            return Ok("Бронирование успешно создано.");
         }
 
-        [HttpPut("{id}/confirm")]
-        public async Task<IActionResult> ConfirmBooking(int id)
+        // Отмена брони
+        [HttpPut("{id}/cancel")]
+        public async Task<IActionResult> CancelBooking(int id, [FromQuery] int currentUserId)
         {
-            var (success, error) = await _bookingService.ConfirmBookingAsync(id);
+            var (success, error) = await _bookingService.CancelBookingAsync(id, currentUserId);
             if (!success) return BadRequest(error);
-            return Ok("Бронь подтверждена");
+            return Ok("Бронь успешно отменена.");
+        }
+
+        // Подтверждение брони (только админ)
+        [HttpPut("{id}/confirm")]
+        public async Task<IActionResult> ConfirmBooking(int id, [FromQuery] int currentUserId)
+        {
+            var (success, error) = await _bookingService.ConfirmBookingAsync(id, currentUserId);
+            if (!success) return BadRequest(error);
+            return Ok("Бронь подтверждена.");
         }
     }
 }

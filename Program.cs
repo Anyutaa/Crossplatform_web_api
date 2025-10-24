@@ -1,4 +1,5 @@
 ﻿using Crossplatform_2_smirnova.Data;
+using Crossplatform_2_smirnova.Models;
 using Crossplatform_2_smirnova.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,6 +28,24 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+    if (!context.Users.Any(u => u.Role == UserRole.Admin))
+    {
+        context.Users.Add(new User
+        {
+            Name = "Admin",
+            Email = "admin@example.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"), // сразу хешируем пароль
+            Role = UserRole.Admin,
+            Status = UserStatus.Active
+        });
+        context.SaveChanges();
+    }
+}
+
 // Применяем миграции при старте приложения
 using (var scope = app.Services.CreateScope())
 {
@@ -43,6 +62,7 @@ if (app.Environment.IsDevelopment())
         c.RoutePrefix = "swagger"; // Теперь Swagger будет доступен по /swagger
     });
 }
+
 
 app.UseHttpsRedirection();
 app.UseAuthorization();

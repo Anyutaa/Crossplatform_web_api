@@ -5,8 +5,17 @@ using Crossplatform_2_smirnova.Data;
 
 namespace Crossplatform_2_smirnova.Models
 {
+    public enum RoomStatus
+    {
+        Available,
+        Maintenance,
+        Blocked,
+        Archived
+    }
+
     public class Room
     {
+
         public int Id { get; set; }
 
         [Required]
@@ -20,17 +29,17 @@ namespace Crossplatform_2_smirnova.Models
         [Range(0, double.MaxValue)]
         public decimal PricePerDay { get; set; }
 
-        public bool IsActive { get; set; } = true;
+        [Required]
+        public RoomStatus Status { get; set; } = RoomStatus.Available;
 
-        // Навигационное свойство для связи многие-ко-многим
         public ICollection<BookingRoom> BookingRooms { get; set; } = new List<BookingRoom>();
 
-        // --- Бизнес-логика ---
+        public void Archive() => Status = RoomStatus.Archived;
+        public void SetMaintenance() => Status = RoomStatus.Maintenance;
+        public void SetBlocked() => Status = RoomStatus.Blocked;
+        public void Restore() => Status = RoomStatus.Available;
 
-        public void MarkAsDeleted() => IsActive = false;
-        public void Restore() => IsActive = true;
-
-        public bool CanBeBooked() => IsActive;
+        public bool CanBeBooked() => Status == RoomStatus.Available;
 
         public void UpdatePrice(decimal newPrice)
         {

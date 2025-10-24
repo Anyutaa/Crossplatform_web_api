@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Crossplatform_2_smirnova.Models;
+using BCrypt.Net;
 
 namespace Crossplatform_2_smirnova.Data
 {
@@ -14,11 +15,8 @@ namespace Crossplatform_2_smirnova.Data
         public DbSet<User> Users { get; set; }
         public DbSet<Room> Rooms { get; set; }
         public DbSet<Booking> Bookings { get; set; }
-
-        // Новый DbSet для промежуточной таблицы
         public DbSet<BookingRoom> BookingRooms { get; set; }
 
-        // Настройка связей и правил удаления
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -26,16 +24,16 @@ namespace Crossplatform_2_smirnova.Data
             // User → Room (1 ко многим)
             modelBuilder.Entity<Room>()
                 .HasOne<User>()
-                .WithMany() 
+                .WithMany()
                 .HasForeignKey(r => r.OwnerId)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
 
             // User → Booking (1 ко многим)
             modelBuilder.Entity<Booking>()
                 .HasOne<User>()
-                .WithMany() 
+                .WithMany()
                 .HasForeignKey(b => b.UserId)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
 
             // Связь многие-ко-многим через BookingRoom
             modelBuilder.Entity<BookingRoom>()
@@ -45,13 +43,13 @@ namespace Crossplatform_2_smirnova.Data
                 .HasOne(br => br.Booking)
                 .WithMany(b => b.BookingRooms)
                 .HasForeignKey(br => br.BookingId)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<BookingRoom>()
                 .HasOne(br => br.Room)
                 .WithMany(r => r.BookingRooms)
                 .HasForeignKey(br => br.RoomId)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
 
             // Уникальный Email у пользователей
             modelBuilder.Entity<User>()
@@ -62,7 +60,19 @@ namespace Crossplatform_2_smirnova.Data
             modelBuilder.Entity<Booking>()
                 .Property(b => b.Status)
                 .HasConversion<string>();
-        }
 
+            // --- Добавление начального администратора ---
+            var adminPassword = 
+
+            modelBuilder.Entity<User>().HasData(new User
+            {
+                Id = 3,
+                Email = "admin@example.com",
+                Name = "Admin",
+                PasswordHash = "$2a$11$65jcjY9zzNv6j5f55Oh52.yStCAEt4WZaUdqynjYGNKJW1mHYoPqq", // статический хэш
+                Role = UserRole.Admin,
+                Status = UserStatus.Active
+            });
+        }
     }
 }

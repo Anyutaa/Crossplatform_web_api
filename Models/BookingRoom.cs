@@ -17,5 +17,9 @@ namespace Crossplatform_2_smirnova.Models
 
         [JsonIgnore]
         public Room Room { get; set; } = null!;
+
+        [Column(TypeName = "decimal(18,2)")]
+        [Range(0, double.MaxValue)]
+        public decimal PriceAtBooking { get; set; }
     }
 }

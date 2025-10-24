@@ -14,88 +14,143 @@ namespace Crossplatform_2_smirnova.Services
             _context = context;
         }
 
-        // Получить всех пользователей
+        // Получить всех активных пользователей
         public async Task<List<User>> GetAllUsersAsync()
         {
             return await _context.Users
-                .Where(u => u.IsActive)
+                .Where(u => u.Status == UserStatus.Active)
                 .ToListAsync();
         }
 
-        // Получить одного пользователя по ID
+        // Получить одного пользователя по ID (только если не архивирован)
         public async Task<User?> GetUserByIdAsync(int id)
         {
             return await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == id && u.IsActive);
+                .FirstOrDefaultAsync(u => u.Id == id && u.Status != UserStatus.Archived);
         }
 
         // Добавить нового пользователя
-        public async Task<(bool success, string? error)> CreateUserAsync(User user, string password)
+        public async Task<(bool success, User? user, string? error)> CreateUserAsync(string email, string name, string password)
         {
-            if (await _context.Users.AnyAsync(u => u.Email == user.Email))
-                return (false, "Пользователь с таким email уже существует.");
+            if (await _context.Users.AnyAsync(u => u.Email == email))
+                return (false, null, "Пользователь с таким email уже существует.");
 
-            // Хэширование пароля
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
+            var user = new User
+            {
+                Email = email,
+                Name = name,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password)
+            };
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
-            return (true, null);
+
+            return (true, user, null);
         }
-        // Метод аутентификации
-        public async Task<User?> AuthenticateUserAsync(string email, string password)
-        {
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == email && u.IsActive);
 
-            if (user == null)
-                return null;
 
-            // Проверка пароля
-            if (BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
-                return user;
-
-            return null;
-        }
-        // UserService.cs
-        public async Task<(bool success, string? error)> UpdateUserAsync(User updatedUser)
+        // Обновить пользователя
+        public async Task<(bool success, string? error)> UpdateUserAsync(User updatedUser, User currentUser)
         {
             var existingUser = await _context.Users.FindAsync(updatedUser.Id);
             if (existingUser == null)
                 return (false, "Пользователь не найден.");
 
-            // Проверяем email на уникальность (если изменился)
+            // Нельзя редактировать архивированного пользователя
+            if (existingUser.Status == UserStatus.Archived)
+                return (false, "Нельзя редактировать архивированного пользователя.");
+
+            // Проверка email на уникальность
             if (existingUser.Email != updatedUser.Email &&
                 await _context.Users.AnyAsync(u => u.Email == updatedUser.Email))
                 return (false, "Пользователь с таким email уже существует.");
 
-            // Обновляем разрешенные поля
+            // Обновляем поля
             existingUser.Email = updatedUser.Email;
             existingUser.Name = updatedUser.Name;
-            existingUser.Role = updatedUser.Role;
-            existingUser.IsActive = updatedUser.IsActive;
+
+            // Только админ может менять роль и статус
+            if (currentUser.Role == UserRole.Admin)
+            {
+                existingUser.Role = updatedUser.Role;
+                existingUser.Status = updatedUser.Status;
+            }
 
             await _context.SaveChangesAsync();
             return (true, null);
         }
-        // Удалить (мягко) пользователя
-        public async Task<(bool success, string? error)> DeleteUserAsync(int id)
+
+
+        // Архивирование пользователя
+        public async Task<(bool success, string? error)> ArchiveUserAsync(int userId)
         {
-            var user = await _context.Users.FindAsync(id);
+            var user = await _context.Users.FindAsync(userId);
             if (user == null)
                 return (false, "Пользователь не найден.");
 
-            // Проверка: есть ли комнаты или брони
-            bool hasRooms = await _context.Rooms.AnyAsync(r => r.OwnerId == id);
-            bool hasBookings = await _context.Bookings.AnyAsync(b => b.UserId == id);
+            if (user.Status == UserStatus.Archived)
+                return (false, "Пользователь уже архивирован.");
 
-            if (hasRooms || hasBookings)
-                return (false, "Нельзя удалить пользователя, у которого есть комнаты или брони.");
+            user.Archive();
 
-            user.IsActive = false;
+            var rooms = await _context.Rooms
+                .Where(r => r.OwnerId == userId && r.Status != RoomStatus.Archived)
+                .ToListAsync();
+
+            foreach (var room in rooms)
+                room.Archive();
+
+            var bookings = await _context.Bookings
+                .Where(b => b.UserId == userId && (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Confirmed))
+                .ToListAsync();
+
+            foreach (var booking in bookings)
+                booking.Cancel();
+
             await _context.SaveChangesAsync();
-
             return (true, null);
         }
+
+
+        public async Task<(bool success, string? error)> BlockUserAsync(int id)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return (false, "Пользователь не найден.");
+
+            user.Block();
+
+            var rooms = await _context.Rooms
+                .Where(r => r.OwnerId == id && r.Status == RoomStatus.Available)
+                .ToListAsync();
+            foreach (var room in rooms)
+                room.SetBlocked();
+
+            var bookings = await _context.Bookings
+                .Where(b => b.UserId == id && (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Confirmed))
+                .ToListAsync();
+            foreach (var booking in bookings)
+                booking.Cancel();
+
+            await _context.SaveChangesAsync();
+            return (true, null);
+        }
+
+        public async Task<(bool success, string? error)> UnblockUserAsync(int id)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return (false, "Пользователь не найден.");
+
+            user.Unblock();
+
+            var rooms = await _context.Rooms
+                .Where(r => r.OwnerId == id && r.Status == RoomStatus.Blocked)
+                .ToListAsync();
+            foreach (var room in rooms)
+                room.Restore();
+
+            await _context.SaveChangesAsync();
+            return (true, null);
+        }
+
     }
 }
