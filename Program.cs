@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.UseUrls("http://*:5000");
 
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<RoomService>();
@@ -101,18 +102,15 @@ using (var scope = app.Services.CreateScope())
     context.Database.Migrate();
 }
 
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Booking API v1");
-        c.RoutePrefix = "swagger"; 
-    });
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Booking API v1");
+    c.RoutePrefix = "swagger";
+});
 
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
 

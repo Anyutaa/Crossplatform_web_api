@@ -1,6 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Crossplatform_2_smirnova.Data;
+﻿using Crossplatform_2_smirnova.Data;
 using Crossplatform_2_smirnova.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Crossplatform_2_smirnova.Services
 {
@@ -52,10 +53,12 @@ namespace Crossplatform_2_smirnova.Services
         }
 
         // Создание бронирования
-        public async Task<(bool success, string? error)> CreateBookingAsync(int userId, int roomId, DateTime start, DateTime end)
+        public async Task<(bool success, string? error)> CreateBookingAsync(int userId, [FromQuery] string roomIds, DateTime start, DateTime end)
         {
+            var roomIdArray = roomIds.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                                 .Select(int.Parse)
+                                 .ToArray();
             var user = await _context.Users.FindAsync(userId);
-            var room = await _context.Rooms.FindAsync(roomId);
 
             if (user == null)
                 return (false, "Пользователь не найден.");
@@ -63,27 +66,37 @@ namespace Crossplatform_2_smirnova.Services
             if (user.Status != UserStatus.Active)
                 return (false, "Заблокированный или архивированный пользователь не может создавать бронирования.");
 
-            if (room == null)
-                return (false, "Комната не найдена.");
-
-            if (room.Status != RoomStatus.Available)
-                return (false, "Комната недоступна для бронирования.");
+            if (roomIdArray == null || roomIdArray.Length == 0)
+                return (false, "Не указаны комнаты для бронирования.");
 
             if (start >= end)
                 return (false, "Дата окончания должна быть позже даты начала.");
 
-            bool hasOverlap = await _context.Bookings
+            // Получаем все комнаты одним запросом
+            var rooms = await _context.Rooms
+                .Where(r => roomIdArray.Contains(r.Id))
+                .ToListAsync();
+
+            if (rooms.Count != roomIdArray.Length)
+                return (false, "Одна или несколько комнат не найдены.");
+
+            // Проверяем доступность всех комнат
+            var unavailableRoom = rooms.FirstOrDefault(r => r.Status != RoomStatus.Available);
+            if (unavailableRoom != null)
+                return (false, $"Комната {unavailableRoom.Id} недоступна для бронирования.");
+
+            var hasOverlap = await _context.Bookings
                 .Include(b => b.BookingRooms)
                 .AnyAsync(b =>
-                    b.BookingRooms.Any(br => br.RoomId == roomId) &&
                     (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Confirmed) &&
                     b.StartDate < end &&
-                    start < b.EndDate);
+                    start < b.EndDate &&
+                    b.BookingRooms.Any(br => roomIdArray.Contains(br.RoomId)));
 
             if (hasOverlap)
-                return (false, "Комната уже забронирована на эти даты.");
+                return (false, "Одна или несколько комнат уже забронированы на эти даты.");
 
-            // Создаём бронь
+            // Создаём брони
             var booking = new Booking
             {
                 UserId = userId,
@@ -91,16 +104,18 @@ namespace Crossplatform_2_smirnova.Services
                 EndDate = end
             };
 
-            var bookingRoom = new BookingRoom
+            foreach (var room in rooms)
             {
-                RoomId = roomId,
-                Booking = booking,
-                PriceAtBooking = room.PricePerDay
-            };
+                var bookingRoom = new BookingRoom
+                {
+                    RoomId = room.Id,
+                    Booking = booking,
+                    PriceAtBooking = room.PricePerDay
+                };
+                booking.BookingRooms.Add(bookingRoom);
+            }
 
-            booking.BookingRooms.Add(bookingRoom);
             booking.CalculateTotalPrice();
-
             _context.Bookings.Add(booking);
             await _context.SaveChangesAsync();
 

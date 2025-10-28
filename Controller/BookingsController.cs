@@ -47,10 +47,10 @@ namespace Crossplatform_2_smirnova.Controllers
         // Создание брони (только активные пользователи)
         [HttpPost]
         [Authorize(Roles = "User,Admin")]
-        public async Task<IActionResult> CreateBooking([FromQuery] int roomId, [FromQuery] DateTime start, [FromQuery] DateTime end)
+        public async Task<IActionResult> CreateBooking([FromQuery] string roomIds, [FromQuery] DateTime start, [FromQuery] DateTime end)
         {
             var userId = GetCurrentUserId();
-            var (success, error) = await _bookingService.CreateBookingAsync(userId, roomId, start, end);
+            var (success, error) = await _bookingService.CreateBookingAsync(userId, roomIds, start, end);
             if (!success) return BadRequest(error);
             return Ok("Бронирование успешно создано.");
         }
