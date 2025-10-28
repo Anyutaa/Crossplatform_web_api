@@ -63,8 +63,7 @@ namespace Crossplatform_2_smirnova.Controllers
         }
 
 
-        // Обновить пользователя (только админ или сам пользователь)
-        // Для обычного пользователя
+
         [HttpPut("{id}/update")]
         public async Task<IActionResult> UpdateUser(int id, [FromBody] UserUpdateRequest request)
         {
@@ -93,12 +92,10 @@ namespace Crossplatform_2_smirnova.Controllers
             });
         }
 
-        // Для админа
         [HttpPut("{id}/change-role")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> ToggleUserRole(int id)
         {
-            // Получаем текущего пользователя (админа)
             var currentUserId = GetCurrentUserId();
             var currentUser = await _userService.GetUserByIdAsync(currentUserId);
 
