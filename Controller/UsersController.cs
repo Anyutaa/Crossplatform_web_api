@@ -1,12 +1,16 @@
 ﻿using Crossplatform_2_smirnova.Models;
 using Crossplatform_2_smirnova.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 
-namespace Crossplatform_2_smirnova.Controller
+namespace Crossplatform_2_smirnova.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize] 
     public class UsersController : ControllerBase
     {
         private readonly UserService _userService;
@@ -16,8 +20,25 @@ namespace Crossplatform_2_smirnova.Controller
             _userService = userService;
         }
 
-        // Получить всех пользователей (для администратора)
+        [HttpPost("register")]
+        [AllowAnonymous]
+        public async Task<ActionResult<object>> Register([FromBody] CreateUserRequest request)
+        {
+            var (success, user, error) = await _userService.CreateUserAsync(
+                request.Email, request.Name, request.Password);
+
+            if (!success)
+                return BadRequest(new { error });
+
+            return Ok(new { message = "User registered successfully", user = new { user.Id, user.Email, user.Name } });
+        }
+
+        private int GetCurrentUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        private string GetCurrentUserRole() => User.FindFirstValue(ClaimTypes.Role)!;
+
+        // Получить всех пользователей (только для админа)
         [HttpGet]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetAll([FromQuery] bool includeArchived = false)
         {
             var users = await _userService.GetAllUsersAsync();
@@ -27,67 +48,81 @@ namespace Crossplatform_2_smirnova.Controller
             return Ok(users);
         }
 
-        // Получить пользователя по ID
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(int id, [FromQuery] bool includeArchived = false)
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetById(int id)
         {
-            var user = await _userService.GetUserByIdAsync(id);
+            var currentUserId = GetCurrentUserId();
+            var currentUserRole = GetCurrentUserRole();
 
-            if (user == null || (!includeArchived && user.Status == UserStatus.Archived))
+            var user = await _userService.GetUserByIdAsync(id);
+            if (user == null)
                 return NotFound("Пользователь не найден.");
 
             return Ok(user);
         }
 
-        // Создать нового пользователя
-        [HttpPost]
-        public async Task<IActionResult> Create([FromBody] CreateUserRequest request)
+
+        // Обновить пользователя (только админ или сам пользователь)
+        // Для обычного пользователя
+        [HttpPut("{id}/update")]
+        public async Task<IActionResult> UpdateUser(int id, [FromBody] UserUpdateRequest request)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+            var currentUserId = GetCurrentUserId();
 
-            var (success, user, error) = await _userService.CreateUserAsync(
-                request.Email, request.Name, request.Password);
+            if (currentUserId != id)
+                return StatusCode(403, "Нет доступа для обновления данных другого пользователя.");
 
+            var existingUser = await _userService.GetUserByIdAsync(id);
+            if (existingUser == null)
+                return NotFound("Пользователь не найден.");
+
+            var currentUser = await _userService.GetUserByIdAsync(currentUserId);
+
+            existingUser.Email = request.Email;
+            existingUser.Name = request.Name;
+
+            var (success, error) = await _userService.UpdateUserAsync(existingUser, currentUser);
             if (!success)
-                return BadRequest(error);
+                return BadRequest(new { error });
 
-            return CreatedAtAction(nameof(GetById), new { id = user!.Id }, new
+            return Ok(new
             {
-                user.Id,
-                user.Email,
-                user.Name,
-                user.Role,
-                user.Status
+                message = "Пользователь успешно обновлён",
+                user = new { existingUser.Id, existingUser.Email, existingUser.Name }
             });
         }
 
-        // Обновить пользователя
-        [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] User updatedUser, [FromQuery] int currentUserId)
+        // Для админа
+        [HttpPut("{id}/change-role")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ToggleUserRole(int id)
         {
-            if (id != updatedUser.Id)
-                return BadRequest("ID в пути не совпадает с ID пользователя.");
-
+            // Получаем текущего пользователя (админа)
+            var currentUserId = GetCurrentUserId();
             var currentUser = await _userService.GetUserByIdAsync(currentUserId);
-            if (currentUser == null)
-                return BadRequest("Текущий пользователь не найден.");
 
-            var (success, error) = await _userService.UpdateUserAsync(updatedUser, currentUser);
+            var user = await _userService.GetUserByIdAsync(id);
+            if (user == null)
+                return NotFound("Пользователь не найден.");
+
+            var oldRole = user.Role;
+            user.Role = user.Role == UserRole.Admin ? UserRole.User : UserRole.Admin;
+            var (success, error) = await _userService.UpdateUserAsync(user, currentUser);
             if (!success)
-                return BadRequest(error);
+                return BadRequest(new { error });
 
-            return Ok("Пользователь успешно обновлён.");
+            return Ok(new
+            {
+                message = $"Роль пользователя успешно изменена с '{oldRole}' на '{user.Role}'",
+                user = new { user.Id, user.Email, user.Name, user.Role }
+            });
         }
 
-        // Архивация пользователя (только админ)
         [HttpPut("{id}/archive")]
-        public async Task<IActionResult> ArchiveUser(int id, [FromQuery] int currentUserId)
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ArchiveUser(int id)
         {
-            var currentUser = await _userService.GetUserByIdAsync(currentUserId);
-            if (currentUser == null || currentUser.Role != UserRole.Admin)
-                return Forbid("Только администратор может архивировать пользователей.");
-
             var (success, error) = await _userService.ArchiveUserAsync(id);
             if (!success)
                 return BadRequest(error);
@@ -95,14 +130,10 @@ namespace Crossplatform_2_smirnova.Controller
             return Ok("Пользователь и связанные данные успешно архивированы.");
         }
 
-        // Заблокировать пользователя (только админ)
         [HttpPut("{id}/block")]
-        public async Task<IActionResult> BlockUser(int id, [FromQuery] int currentUserId)
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> BlockUser(int id)
         {
-            var currentUser = await _userService.GetUserByIdAsync(currentUserId);
-            if (currentUser == null || currentUser.Role != UserRole.Admin)
-                return Forbid("Только администратор может блокировать пользователей.");
-
             var (success, error) = await _userService.BlockUserAsync(id);
             if (!success)
                 return BadRequest(error);
@@ -110,14 +141,10 @@ namespace Crossplatform_2_smirnova.Controller
             return Ok("Пользователь и его комнаты заблокированы, активные брони отменены.");
         }
 
-        // Разблокировать пользователя (только админ)
         [HttpPut("{id}/unblock")]
-        public async Task<IActionResult> UnblockUser(int id, [FromQuery] int currentUserId)
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UnblockUser(int id)
         {
-            var currentUser = await _userService.GetUserByIdAsync(currentUserId);
-            if (currentUser == null || currentUser.Role != UserRole.Admin)
-                return Forbid("Только администратор может разблокировать пользователей.");
-
             var (success, error) = await _userService.UnblockUserAsync(id);
             if (!success)
                 return BadRequest(error);
@@ -125,8 +152,17 @@ namespace Crossplatform_2_smirnova.Controller
             return Ok("Пользователь и его комнаты разблокированы.");
         }
 
-        // DTO для создания пользователя
-        public class CreateUserRequest
+
+        public class CreateUserRequest { 
+            [Required, EmailAddress] 
+            public string Email { get; set; } = string.Empty; 
+            [Required, StringLength(50)] 
+            public string Name { get; set; } = string.Empty; 
+            [Required, MinLength(8)] 
+            public string Password { get; set; } = string.Empty; 
+        }
+
+        public class UserUpdateRequest
         {
             [Required, EmailAddress]
             public string Email { get; set; } = string.Empty;
@@ -134,8 +170,9 @@ namespace Crossplatform_2_smirnova.Controller
             [Required, StringLength(50)]
             public string Name { get; set; } = string.Empty;
 
-            [Required, MinLength(8)]
-            public string Password { get; set; } = string.Empty;
         }
+
     }
 }
+
+        

@@ -1,7 +1,11 @@
-﻿using Crossplatform_2_smirnova.Data;
+﻿using Crossplatform_2_smirnova;
+using Crossplatform_2_smirnova.Data;
 using Crossplatform_2_smirnova.Models;
 using Crossplatform_2_smirnova.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,11 +26,55 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
     {
         Title = "Booking System API Smirnova",
+        Version = "v1",
         Description = "API системы бронирования помещений"
+    });
+
+    // 🔐 Добавляем JWT поддержку
+    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "Введите токен в формате: Bearer {token}",
+        Name = "Authorization",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey
+    });
+
+    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
     });
 });
 
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = AuthOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = AuthOptions.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = AuthOptions.SigningKey,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
+        };
+    });
+
 var app = builder.Build();
+app.UseAuthentication();
+app.UseAuthorization();
 
 using (var scope = app.Services.CreateScope())
 {
@@ -38,7 +86,7 @@ using (var scope = app.Services.CreateScope())
         {
             Name = "Admin",
             Email = "admin@example.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"), // сразу хешируем пароль
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"), 
             Role = UserRole.Admin,
             Status = UserStatus.Active
         });
@@ -59,7 +107,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Booking API v1");
-        c.RoutePrefix = "swagger"; // Теперь Swagger будет доступен по /swagger
+        c.RoutePrefix = "swagger"; 
     });
 }
 

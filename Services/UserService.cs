@@ -152,5 +152,18 @@ namespace Crossplatform_2_smirnova.Services
             return (true, null);
         }
 
+        public async Task<User?> AuthenticateUserAsync(string email, string password)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+                return null;
+
+            if (user.Status != UserStatus.Active)
+                return null;
+
+            return user;
+        }
+
+
     }
 }

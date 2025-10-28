@@ -62,7 +62,6 @@ namespace Crossplatform_2_smirnova.Data
                 .HasConversion<string>();
 
             // --- Добавление начального администратора ---
-            var adminPassword = 
 
             modelBuilder.Entity<User>().HasData(new User
             {

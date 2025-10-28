@@ -42,9 +42,11 @@ namespace Crossplatform_2_smirnova.Services
             return (true, room, null);
         }
 
-        public async Task<(bool success, string? error)> UpdateRoomAsync(Room updatedRoom, int currentUserId)
+        public async Task<(bool success, string? error)> UpdateRoomAsync(int roomId, UpdateRoomRequest request, int currentUserId)
         {
-            var existingRoom = await _context.Rooms.FindAsync(updatedRoom.Id);
+            var existingRoom = await _context.Rooms
+                .FirstOrDefaultAsync(r => r.Id == roomId);
+
             if (existingRoom == null)
                 return (false, "Комната не найдена.");
 
@@ -64,22 +66,41 @@ namespace Crossplatform_2_smirnova.Services
             if (currentUser.Status != UserStatus.Active)
                 return (false, "Пользователь неактивен и не может редактировать комнаты.");
 
+            // Частичное обновление
+            if (!string.IsNullOrWhiteSpace(request.Name))
+                existingRoom.Name = request.Name.Trim();
 
-            existingRoom.Name = updatedRoom.Name.Trim();
-            existingRoom.PricePerDay = updatedRoom.PricePerDay;
+            if (request.PricePerDay.HasValue)
+                existingRoom.PricePerDay = request.PricePerDay.Value;
 
-            if (isAdmin)
+            // Обработка статуса с учетом прав
+            if (request.Status.HasValue)
             {
-                existingRoom.Status = updatedRoom.Status; 
-                if (updatedRoom.OwnerId != existingRoom.OwnerId)
-                    existingRoom.OwnerId = updatedRoom.OwnerId;
+                if (isAdmin)
+                {
+                    existingRoom.Status = request.Status.Value;
+                }
+                else if (isOwner)
+                {
+                    if (request.Status.Value == RoomStatus.Maintenance || request.Status.Value == RoomStatus.Available)
+                        existingRoom.Status = request.Status.Value;
+                    else
+                        return (false, "Владелец не может архивировать комнату.");
+                }
             }
-            else if (isOwner)
+
+            // Для админа - возможность сменить владельца
+            if (isAdmin && request.OwnerId.HasValue)
             {
-                if (updatedRoom.Status == RoomStatus.Maintenance || updatedRoom.Status == RoomStatus.Available)
-                    existingRoom.Status = updatedRoom.Status;
+                var newOwner = await _context.Users.FindAsync(request.OwnerId.Value);
+                if (newOwner != null)
+                {
+                    existingRoom.OwnerId = request.OwnerId.Value;
+                }
                 else
-                    return (false, "Владелец не может архивировать комнату.");
+                {
+                    return (false, "Новый владелец не найден.");
+                }
             }
 
             await _context.SaveChangesAsync();
@@ -142,6 +163,14 @@ namespace Crossplatform_2_smirnova.Services
                 .AnyAsync();
 
             return !overlapping;
+        }
+
+        public class UpdateRoomRequest
+        {
+            public string? Name { get; set; }
+            public decimal? PricePerDay { get; set; }
+            public RoomStatus? Status { get; set; }
+            public int? OwnerId { get; set; } 
         }
     }
 }

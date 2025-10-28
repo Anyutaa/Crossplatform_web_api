@@ -1,11 +1,15 @@
 ﻿using Crossplatform_2_smirnova.Models;
 using Crossplatform_2_smirnova.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using static Crossplatform_2_smirnova.Services.RoomService;
 
-namespace Crossplatform_2_smirnova.Controller
+namespace Crossplatform_2_smirnova.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize] 
     public class RoomsController : ControllerBase
     {
         private readonly RoomService _roomService;
@@ -15,54 +19,62 @@ namespace Crossplatform_2_smirnova.Controller
             _roomService = roomService;
         }
 
-        // Получить комнату по ID
+        private int GetCurrentUserId() =>
+            int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetRoom(int id, [FromQuery] int currentUserId)
+        public async Task<IActionResult> GetRoom(int id)
         {
+            var currentUserId = GetCurrentUserId();
             var room = await _roomService.GetRoomByIdAsync(id, currentUserId);
+
             if (room == null)
                 return NotFound("Комната не найдена или недоступна для текущего пользователя.");
 
             return Ok(room);
         }
 
-        // Создать комнату
         [HttpPost]
-        public async Task<IActionResult> CreateRoom([FromQuery] int ownerId, [FromQuery] string name, [FromQuery] decimal pricePerDay)
+        public async Task<IActionResult> CreateRoom([FromQuery] string name, [FromQuery] decimal pricePerDay)
         {
+            var ownerId = GetCurrentUserId();
             var (success, room, error) = await _roomService.CreateRoomAsync(ownerId, name, pricePerDay);
+
             if (!success)
                 return BadRequest(error);
 
             return Ok(room);
         }
 
-        // Обновить комнату
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateRoom(int id, [FromBody] Room updatedRoom, [FromQuery] int currentUserId)
+        [HttpPatch("{id}")]
+        public async Task<IActionResult> UpdateRoom(int id, [FromBody] UpdateRoomRequest request)
         {
-            if (id != updatedRoom.Id)
-                return BadRequest("ID в пути не совпадает с ID в теле запроса.");
+            if (request == null)
+                return BadRequest("Тело запроса не может быть пустым.");
 
-            var (success, error) = await _roomService.UpdateRoomAsync(updatedRoom, currentUserId);
+            var currentUserId = GetCurrentUserId();
+            var (success, error) = await _roomService.UpdateRoomAsync(id, request, currentUserId);
+
             if (!success)
                 return BadRequest(error);
 
             return Ok("Комната успешно обновлена.");
         }
 
-        // Архивировать комнату
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> ArchiveRoom(int id)
         {
             var (success, error) = await _roomService.ArchiveRoomAsync(id);
+
             if (!success)
                 return BadRequest(error);
 
             return Ok("Комната успешно архивирована и активные брони отменены.");
         }
 
-        // Получить все доступные комнаты (для обычных пользователей)
+        [AllowAnonymous] 
         [HttpGet("available")]
         public async Task<IActionResult> GetAvailableRooms()
         {

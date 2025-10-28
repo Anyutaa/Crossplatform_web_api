@@ -19,39 +19,33 @@ namespace Crossplatform_2_smirnova.Services
         public async Task<List<Booking>> GetAllBookingsAsync(int currentUserId)
         {
             var currentUser = await _context.Users.FindAsync(currentUserId);
-            if (currentUser == null)
-                return new List<Booking>();
 
-            bool isAdmin = currentUser.Role == UserRole.Admin;
-
-            if (isAdmin)
+            if (currentUser?.Role == UserRole.Admin)
+            {
                 return await _context.Bookings
                     .Include(b => b.BookingRooms)
                     .ToListAsync();
-
-            return await _context.Bookings
-                .Where(b => b.UserId == currentUserId)
-                .Include(b => b.BookingRooms)
-                .ToListAsync();
+            }
+            else
+            {
+                return await _context.Bookings
+                    .Where(b => b.UserId == currentUserId)
+                    .Include(b => b.BookingRooms)
+                    .ToListAsync();
+            }
         }
 
         // Получить конкретную бронь
         public async Task<Booking?> GetBookingAsync(int id, int currentUserId)
         {
-            var currentUser = await _context.Users.FindAsync(currentUserId);
-            if (currentUser == null)
-                return null;
-
-            bool isAdmin = currentUser.Role == UserRole.Admin;
-
             var booking = await _context.Bookings
                 .Include(b => b.BookingRooms)
                 .FirstOrDefaultAsync(b => b.Id == id);
 
-            if (booking == null)
-                return null;
+            if (booking == null) return null;
 
-            if (!isAdmin && booking.UserId != currentUserId)
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+            if (currentUser?.Role != UserRole.Admin && booking.UserId != currentUserId)
                 return null;
 
             return booking;
