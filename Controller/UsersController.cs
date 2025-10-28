@@ -42,9 +42,6 @@ namespace Crossplatform_2_smirnova.Controllers
         public async Task<IActionResult> GetAll([FromQuery] bool includeArchived = false)
         {
             var users = await _userService.GetAllUsersAsync();
-            if (!includeArchived)
-                users = users.Where(u => u.Status != UserStatus.Archived).ToList();
-
             return Ok(users);
         }
 
