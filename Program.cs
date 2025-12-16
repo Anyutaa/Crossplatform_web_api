@@ -31,7 +31,7 @@ builder.Services.AddSwaggerGen(c =>
         Description = "API системы бронирования помещений"
     });
 
-    // 🔐 Добавляем JWT поддержку
+    // Добавляем JWT поддержку
     c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         In = Microsoft.OpenApi.Models.ParameterLocation.Header,
@@ -73,7 +73,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReact",
+        policy => policy
+            .WithOrigins("http://localhost:3000")
+            .AllowAnyHeader()
+            .AllowAnyMethod());
+});
+
 var app = builder.Build();
+app.UseCors("AllowReact");
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -126,5 +136,7 @@ app.MapGet("/debug/tables", async (ApplicationDbContext context) =>
     };
     return Results.Json(tables);
 });
+
+
 
 app.Run();

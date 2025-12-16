@@ -2,6 +2,7 @@
 using Crossplatform_2_smirnova.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Crossplatform_2_smirnova.DTOs.Bookings;
 
 namespace Crossplatform_2_smirnova.Services
 {
@@ -17,23 +18,35 @@ namespace Crossplatform_2_smirnova.Services
         }
 
         // Получение всех броней (для админа — все, для пользователя — только свои)
-        public async Task<List<Booking>> GetAllBookingsAsync(int currentUserId)
+        public async Task<List<BookingDto>> GetAllBookingsAsync(int currentUserId)
         {
             var currentUser = await _context.Users.FindAsync(currentUserId);
 
-            if (currentUser?.Role == UserRole.Admin)
+            var bookingsQuery = _context.Bookings
+                .Include(b => b.BookingRooms)
+                .ThenInclude(br => br.Room)
+                .AsQueryable();
+
+            if (currentUser?.Role != UserRole.Admin)
+                bookingsQuery = bookingsQuery.Where(b => b.UserId == currentUserId);
+
+            var bookings = await bookingsQuery.ToListAsync();
+
+            return bookings.Select(b => new BookingDto
             {
-                return await _context.Bookings
-                    .Include(b => b.BookingRooms)
-                    .ToListAsync();
-            }
-            else
-            {
-                return await _context.Bookings
-                    .Where(b => b.UserId == currentUserId)
-                    .Include(b => b.BookingRooms)
-                    .ToListAsync();
-            }
+                Id = b.Id,
+                Status = b.Status,
+                CreatedAt = b.CreatedAt,
+                StartDate = b.StartDate,
+                EndDate = b.EndDate,
+                TotalPrice = b.TotalPrice,
+                Rooms = b.BookingRooms.Select(br => new BookingRoomDto
+                {
+                    RoomId = br.RoomId,
+                    RoomName = br.Room.Name, // вот здесь берём имя из Room
+                    PriceAtBooking = br.PriceAtBooking
+                }).ToList()
+            }).ToList();
         }
 
         // Получить конкретную бронь
@@ -171,5 +184,6 @@ namespace Crossplatform_2_smirnova.Services
                 return (false, ex.Message);
             }
         }
+
     }
 }

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 
+
 namespace Crossplatform_2_smirnova.Controllers
 {
     [Route("api/[controller]")]
@@ -18,19 +19,6 @@ namespace Crossplatform_2_smirnova.Controllers
         public UsersController(UserService userService)
         {
             _userService = userService;
-        }
-
-        [HttpPost("register")]
-        [AllowAnonymous]
-        public async Task<ActionResult<object>> Register([FromBody] CreateUserRequest request)
-        {
-            var (success, user, error) = await _userService.CreateUserAsync(
-                request.Email, request.Name, request.Password);
-
-            if (!success)
-                return BadRequest(new { error });
-
-            return Ok(new { message = "User registered successfully", user = new { user.Id, user.Email, user.Name } });
         }
 
         private int GetCurrentUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -152,7 +140,7 @@ namespace Crossplatform_2_smirnova.Controllers
             public string Email { get; set; } = string.Empty; 
             [Required, StringLength(50)] 
             public string Name { get; set; } = string.Empty; 
-            [Required, MinLength(8)] 
+            [Required, MinLength(6)] 
             public string Password { get; set; } = string.Empty; 
         }
 

@@ -54,9 +54,6 @@ namespace Crossplatform_2_smirnova.Services
             if (currentUser == null)
                 return (false, "Пользователь не найден.");
 
-            if (existingRoom.Status == RoomStatus.Archived)
-                return (false, "Нельзя редактировать архивированную комнату.");
-
             bool isAdmin = currentUser.Role == UserRole.Admin;
             bool isOwner = existingRoom.OwnerId == currentUser.Id;
 
@@ -65,6 +62,15 @@ namespace Crossplatform_2_smirnova.Services
 
             if (currentUser.Status != UserStatus.Active)
                 return (false, "Пользователь неактивен и не может редактировать комнаты.");
+            
+            if (existingRoom.Status == RoomStatus.Archived)
+            {
+                if (!request.Status.HasValue || request.Status.Value == RoomStatus.Archived)
+                    return (false, "Архивированную комнату нельзя редактировать.");
+                if (!isAdmin && !isOwner)
+                    return (false, "Недостаточно прав для разархивации комнаты.");
+                existingRoom.Status = request.Status.Value;
+            }
 
             // Частичное обновление
             if (!string.IsNullOrWhiteSpace(request.Name))
@@ -82,10 +88,16 @@ namespace Crossplatform_2_smirnova.Services
                 }
                 else if (isOwner)
                 {
-                    if (request.Status.Value == RoomStatus.Maintenance || request.Status.Value == RoomStatus.Available)
+                    if (request.Status.Value == RoomStatus.Available ||
+                        request.Status.Value == RoomStatus.Maintenance ||
+                        request.Status.Value == RoomStatus.Archived)
+                    {
                         existingRoom.Status = request.Status.Value;
+                    }
                     else
-                        return (false, "Владелец не может архивировать комнату.");
+                    {
+                        return (false, "Владелец не может установить данный статус комнаты.");
+                    }
                 }
             }
 
@@ -135,19 +147,27 @@ namespace Crossplatform_2_smirnova.Services
                 .Where(r => r.Status == RoomStatus.Available)
                 .ToListAsync();
         }
-        public async Task<Room?> GetRoomByIdAsync(int id, int currentUserId)
+
+        public async Task<List<Room>> GetRoomsForUserAsync(int currentUserId)
         {
             var currentUser = await _context.Users.FindAsync(currentUserId);
             if (currentUser == null)
-                return null;
+                return new List<Room>();
 
             bool isAdmin = currentUser.Role == UserRole.Admin;
 
-            if (isAdmin)
-                return await _context.Rooms.FirstOrDefaultAsync(r => r.Id == id);
-
+            // Если админ — возвращаем все комнаты, иначе только свои
             return await _context.Rooms
-                .FirstOrDefaultAsync(r => r.Id == id && r.Status != RoomStatus.Archived);
+                .Where(r => isAdmin || r.OwnerId == currentUserId)
+                .OrderBy(r => r.Id)
+                .ToListAsync();
+        }
+
+
+        public async Task<Room?> GetRoomByIdAsync(int roomId)
+        {
+            return await _context.Rooms
+                .FirstOrDefaultAsync(r => r.Id == roomId && r.Status != RoomStatus.Archived);
         }
 
         // Проверка доступности комнаты на даты

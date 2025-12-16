@@ -2,6 +2,7 @@
 using Crossplatform_2_smirnova.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using static Crossplatform_2_smirnova.Services.RoomService;
 
@@ -22,30 +23,34 @@ namespace Crossplatform_2_smirnova.Controllers
         private int GetCurrentUserId() =>
             int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetRoom(int id)
+        [HttpGet]
+        public async Task<IActionResult> GetRooms()
         {
             var currentUserId = GetCurrentUserId();
-            var room = await _roomService.GetRoomByIdAsync(id, currentUserId);
+            var rooms = await _roomService.GetRoomsForUserAsync(currentUserId);
+            return Ok(rooms);
+        }
 
-            if (room == null)
-                return NotFound("Комната не найдена или недоступна для текущего пользователя.");
-
-            return Ok(room);
+        public class CreateRoomDto
+        {
+            public string Name { get; set; }
+            public decimal PricePerDay { get; set; }
+            public string? Description { get; set; }
+            public int Status { get; set; }
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateRoom([FromQuery] string name, [FromQuery] decimal pricePerDay)
+        public async Task<IActionResult> CreateRoom([FromBody] CreateRoomDto dto)
         {
             var ownerId = GetCurrentUserId();
-            var (success, room, error) = await _roomService.CreateRoomAsync(ownerId, name, pricePerDay);
+            var (success, room, error) = await _roomService.CreateRoomAsync(ownerId, dto.Name, dto.PricePerDay);
 
             if (!success)
                 return BadRequest(error);
 
             return Ok(room);
         }
+
 
         [HttpPatch("{id}")]
         public async Task<IActionResult> UpdateRoom(int id, [FromBody] UpdateRoomRequest request)
@@ -63,7 +68,6 @@ namespace Crossplatform_2_smirnova.Controllers
         }
 
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> ArchiveRoom(int id)
         {
             var (success, error) = await _roomService.ArchiveRoomAsync(id);
@@ -80,6 +84,17 @@ namespace Crossplatform_2_smirnova.Controllers
         {
             var rooms = await _roomService.GetAllAvailableRoomsAsync();
             return Ok(rooms);
+        }
+        [AllowAnonymous]
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetRoomById(int id)
+        {
+            var room = await _roomService.GetRoomByIdAsync(id);
+
+            if (room == null)
+                return NotFound($"Комната с ID {id} не найдена");
+
+            return Ok(room);
         }
     }
 }
