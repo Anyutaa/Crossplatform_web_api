@@ -3,6 +3,7 @@ using Crossplatform_2_smirnova.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 
@@ -134,15 +135,6 @@ namespace Crossplatform_2_smirnova.Controllers
             return Ok("Пользователь и его комнаты разблокированы.");
         }
 
-
-        public class CreateUserRequest { 
-            [Required, EmailAddress] 
-            public string Email { get; set; } = string.Empty; 
-            [Required, StringLength(50)] 
-            public string Name { get; set; } = string.Empty; 
-            [Required, MinLength(6)] 
-            public string Password { get; set; } = string.Empty; 
-        }
 
         public class UserUpdateRequest
         {

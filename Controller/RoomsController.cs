@@ -35,7 +35,6 @@ namespace Crossplatform_2_smirnova.Controllers
         {
             public string Name { get; set; }
             public decimal PricePerDay { get; set; }
-            public string? Description { get; set; }
             public int Status { get; set; }
         }
 

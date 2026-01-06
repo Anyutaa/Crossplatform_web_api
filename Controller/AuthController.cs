@@ -3,6 +3,7 @@ using Crossplatform_2_smirnova.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using System.ComponentModel.DataAnnotations;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using static Crossplatform_2_smirnova.Controllers.UsersController;
@@ -29,15 +30,9 @@ namespace Crossplatform_2_smirnova.Controllers
                 return BadRequest("Request body is null");
             }
 
-            if (request == null)
-            {
-                Console.WriteLine("Запрос пустой!");
-                return BadRequest("Request body is null");
-            }
-
-            Console.WriteLine($"Регистрация: {request.Email}, {request.Name}, {request.Password}");
+            Console.WriteLine($"Регистрация: {request.Email}, {request.Name}, {request.Password}, {request.TelegramId}, {request.TelegramUsername}");
             var (success, user, error) = await _userService.CreateUserAsync(
-                request.Email, request.Name, request.Password);
+                request.Email, request.Name, request.Password, request.TelegramId, request.TelegramUsername);
 
             if (!success)
                 return BadRequest(new { error });
@@ -47,7 +42,29 @@ namespace Crossplatform_2_smirnova.Controllers
             return Ok(new
             {
                 token = token,
-                user = new { user.Id, user.Email, user.Name }
+                user = new { user.Id, user.Email, user.Name, user.TelegramId, user.TelegramUsername }
+            });
+        }
+        [HttpGet("telegram/{tgId}")]
+        [AllowAnonymous]
+        public IActionResult CheckTelegram(long tgId)
+        {
+            var user = _userService.GetByTelegramId(tgId);
+            if (user == null)
+                return NotFound(new { message = "Пользователь с этим TelegramId не найден" });
+
+            var token = GenerateJwtToken(user);
+
+            return Ok(new
+            {
+                token,
+                user = new
+                {
+                    user.Id,
+                    user.Email,
+                    user.Name,
+                    user.TelegramUsername
+                }
             });
         }
         public class LoginRequest
@@ -92,6 +109,18 @@ namespace Crossplatform_2_smirnova.Controllers
 
             return new JwtSecurityTokenHandler().WriteToken(jwt);
         }
+        public class CreateUserRequest
+        {
+            [Required, EmailAddress]
+            public string Email { get; set; } = string.Empty;
+            [Required, StringLength(50)]
+            public string Name { get; set; } = string.Empty;
+            [Required, MinLength(6)]
+            public string Password { get; set; } = string.Empty;
+            public long? TelegramId { get; set; }
+            public string? TelegramUsername { get; set; }
+        }
+
     }
 }
 

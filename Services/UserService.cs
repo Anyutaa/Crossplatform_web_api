@@ -30,7 +30,9 @@ namespace Crossplatform_2_smirnova.Services
         }
 
         // Добавить нового пользователя
-        public async Task<(bool success, User? user, string? error)> CreateUserAsync(string email, string name, string password)
+        public async Task<(bool success, User? user, string? error)> CreateUserAsync(string email, string name, string password, 
+            long? telegramId = null,
+            string? telegramUsername = null)
         {
             if (await _context.Users.AnyAsync(u => u.Email == email))
                 return (false, null, "Пользователь с таким email уже существует.");
@@ -39,7 +41,9 @@ namespace Crossplatform_2_smirnova.Services
             {
                 Email = email,
                 Name = name,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password)
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+                TelegramId = telegramId,
+                TelegramUsername = telegramUsername
             };
 
             _context.Users.Add(user);
@@ -163,7 +167,10 @@ namespace Crossplatform_2_smirnova.Services
 
             return user;
         }
-
+        public User? GetByTelegramId(long tgId)
+        {
+            return _context.Users.FirstOrDefault(u => u.TelegramId == tgId);
+        }
 
     }
 }

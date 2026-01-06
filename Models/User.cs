@@ -21,6 +21,9 @@ namespace Crossplatform_2_smirnova.Models
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get; set; }
+        public long? TelegramId { get; set; }
+
+        public string? TelegramUsername { get; set; }
 
         [Required, EmailAddress]
         public string Email { get; set; } = string.Empty;
