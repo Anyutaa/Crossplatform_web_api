@@ -119,8 +119,8 @@ User        — создаёт и отменяет свои брони, не в�
 ### Установка
 
 ```bash
-git clone https://github.com/Anyutaa/Crossplatform_web_api.git
-cd Crossplatform_web_api
+git clone https://github.com/Anyutaa/crossplatform-back.git
+cd crossplatform-back
 dotnet restore
 ```
 
