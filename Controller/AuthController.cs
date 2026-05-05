@@ -2,6 +2,7 @@
 using Crossplatform_2_smirnova.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.ComponentModel.DataAnnotations;
 using System.IdentityModel.Tokens.Jwt;
@@ -15,10 +16,12 @@ namespace Crossplatform_2_smirnova.Controllers
     public class AuthController : ControllerBase
     {
         private readonly UserService _userService;
+        private readonly AuthOptions _authOptions;
 
-        public AuthController(UserService userService)
+        public AuthController(UserService userService, IOptions<AuthOptions> authOptions)
         {
             _userService = userService;
+            _authOptions = authOptions.Value;
         }
         [HttpPost("register")]
         [AllowAnonymous]
@@ -26,18 +29,14 @@ namespace Crossplatform_2_smirnova.Controllers
         {
             if (request == null)
             {
-                Console.WriteLine("Request body is null!");
                 return BadRequest("Request body is null");
             }
-
-            Console.WriteLine($"Регистрация: {request.Email}, {request.Name}, {request.Password}, {request.TelegramId}, {request.TelegramUsername}");
             var (success, user, error) = await _userService.CreateUserAsync(
                 request.Email, request.Name, request.Password, request.TelegramId, request.TelegramUsername);
 
             if (!success)
                 return BadRequest(new { error });
             var token = GenerateJwtToken(user);
-            Console.WriteLine($"Регистрация: {request.Email}, {request.Name}");
 
             return Ok(new
             {
@@ -86,8 +85,6 @@ namespace Crossplatform_2_smirnova.Controllers
 
         private string GenerateJwtToken(User user)
         {
-            // Используем ключ из AuthOptions
-            var key = AuthOptions.SigningKey;
 
             var claims = new List<Claim>
             {
@@ -99,12 +96,12 @@ namespace Crossplatform_2_smirnova.Controllers
 
             // Создаём токен
             var jwt = new JwtSecurityToken(
-                issuer: AuthOptions.Issuer,
-                audience: AuthOptions.Audience,
+                issuer: _authOptions.Issuer,
+                audience: _authOptions.Audience,
                 claims: claims,
                 notBefore: DateTime.UtcNow,
-                expires: DateTime.UtcNow.AddHours(AuthOptions.LifetimeInHours),
-                signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
+                expires: DateTime.UtcNow.AddHours(_authOptions.LifetimeInHours),
+                signingCredentials: new SigningCredentials(_authOptions.GetSymmetricSecurityKey(), SecurityAlgorithms.HmacSha256)
             );
 
             return new JwtSecurityTokenHandler().WriteToken(jwt);

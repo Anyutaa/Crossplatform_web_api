@@ -1,20 +1,16 @@
 ﻿using Microsoft.IdentityModel.Tokens;
-using System;
-using System.Collections.Generic;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using System.Text;
 
 namespace Crossplatform_2_smirnova
 {
-    public static class AuthOptions
+    public class AuthOptions
     {
-        public static string Issuer => "BookingSystem";
-        public static string Audience => "BookingClients";
-        public static int LifetimeInHours => 24; 
+        public string Issuer { get; set; } = string.Empty;
+        public string Audience { get; set; } = string.Empty;
+        public int LifetimeInHours { get; set; } = 24;
+        public string SigningKey { get; set; } = string.Empty;
 
-        public static SecurityKey SigningKey =>
-            new SymmetricSecurityKey(Encoding.ASCII.GetBytes("superSecretKeyMustBeLoooooongAndLonger123"));
-
+        public SymmetricSecurityKey GetSymmetricSecurityKey() =>
+            new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey));
     }
 }

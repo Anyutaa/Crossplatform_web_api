@@ -57,17 +57,20 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 
+builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection("Jwt"));
+var authOptions = builder.Configuration.GetSection("Jwt").Get<AuthOptions>()!;
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = AuthOptions.Issuer,
+            ValidIssuer = authOptions.Issuer,
             ValidateAudience = true,
-            ValidAudience = AuthOptions.Audience,
+            ValidAudience = authOptions.Audience,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = AuthOptions.SigningKey,
+            IssuerSigningKey = authOptions.GetSymmetricSecurityKey(),
             ValidateLifetime = true,
             ClockSkew = TimeSpan.Zero
         };
