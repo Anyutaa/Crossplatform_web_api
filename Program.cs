@@ -127,19 +127,5 @@ app.UseSwaggerUI(c =>
 app.UseAuthorization();
 app.MapControllers();
 
-// Временный эндпоинт для просмотра таблиц
-app.MapGet("/debug/tables", async (ApplicationDbContext context) =>
-{
-    var tables = new
-    {
-        Users = await context.Users.ToListAsync(),
-        Rooms = await context.Rooms.ToListAsync(),
-        Bookings = await context.Bookings.ToListAsync(),
-        BookingRooms = await context.BookingRooms.ToListAsync()
-    };
-    return Results.Json(tables);
-});
-
-
 
 app.Run();
