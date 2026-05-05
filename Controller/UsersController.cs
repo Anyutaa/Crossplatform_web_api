@@ -66,6 +66,7 @@ namespace Crossplatform_2_smirnova.Controllers
 
             existingUser.Email = request.Email;
             existingUser.Name = request.Name;
+            existingUser.TelegramUsername = request.TelegramUsername;
 
             var (success, error) = await _userService.UpdateUserAsync(existingUser, currentUser);
             if (!success)
@@ -74,7 +75,7 @@ namespace Crossplatform_2_smirnova.Controllers
             return Ok(new
             {
                 message = "Пользователь успешно обновлён",
-                user = new { existingUser.Id, existingUser.Email, existingUser.Name }
+                user = new { existingUser.Id, existingUser.Email, existingUser.Name, existingUser.TelegramUsername }
             });
         }
 
@@ -144,7 +145,10 @@ namespace Crossplatform_2_smirnova.Controllers
             [Required, StringLength(50)]
             public string Name { get; set; } = string.Empty;
 
+            [StringLength(32)]
+            public string? TelegramUsername { get; set; }
         }
+
 
     }
 }
